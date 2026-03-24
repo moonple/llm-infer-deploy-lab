@@ -52,6 +52,7 @@ class CaseResult:
     duration_ms: float
     timings_ms: dict = field(default_factory=dict)
     response_preview: Optional[str] = None
+    reason: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +104,7 @@ def run_case_online(case: dict, server_url: str) -> CaseResult:
                 ok=False,
                 error_type=ERROR_QUALITY,
                 error_message=quality_msg,
+                reason=quality_msg,
                 duration_ms=dur_ms,
                 timings_ms={"total_ms": dur_ms},
                 response_preview=(body.get("content") or body.get("response") or "")[:200],
@@ -171,10 +173,14 @@ def _build_report(results: list[CaseResult], mode: str) -> dict:
     passed = sum(1 for r in results if r.ok)
     failed = total - passed
 
-    fail_type_counts: dict[str, int] = {}
+    fail_types: dict[str, int] = {}
+    quality_fail_types: dict[str, int] = {}
     for r in results:
         if r.error_type:
-            fail_type_counts[r.error_type] = fail_type_counts.get(r.error_type, 0) + 1
+            if r.error_type == ERROR_QUALITY:
+                quality_fail_types[r.error_type] = quality_fail_types.get(r.error_type, 0) + 1
+            else:
+                fail_types[r.error_type] = fail_types.get(r.error_type, 0) + 1
 
     return {
         "mode": mode,
@@ -182,17 +188,19 @@ def _build_report(results: list[CaseResult], mode: str) -> dict:
             "total": total,
             "passed": passed,
             "failed": failed,
-            "runtime_fail_count": fail_type_counts.get(ERROR_RUNTIME, 0)
-            + fail_type_counts.get(ERROR_TIMEOUT, 0),
-            "quality_fail_count": fail_type_counts.get(ERROR_QUALITY, 0),
-            "config_fail_count": fail_type_counts.get(ERROR_CONFIG, 0),
-            "fail_type_counts": fail_type_counts,
+            "runtime_fail_count": fail_types.get(ERROR_RUNTIME, 0)
+            + fail_types.get(ERROR_TIMEOUT, 0),
+            "quality_fail_count": quality_fail_types.get(ERROR_QUALITY, 0),
+            "config_fail_count": fail_types.get(ERROR_CONFIG, 0),
+            "fail_types": fail_types,
+            "quality_fail_types": quality_fail_types,
         },
         "cases": [
             {
                 "id": r.id,
                 "ok": r.ok,
                 "error_type": r.error_type,
+                "reason": r.reason,
                 "error_message": r.error_message,
                 "duration_ms": r.duration_ms,
                 "timings_ms": r.timings_ms,
@@ -219,24 +227,31 @@ def _build_markdown(report: dict) -> str:
         "",
     ]
 
-    if s.get("fail_type_counts"):
-        lines += ["## Failure Breakdown by Error Type", ""]
-        for err_type, count in sorted(s["fail_type_counts"].items()):
+    if s.get("fail_types"):
+        lines += ["## Failure Types (runtime_error / timeout_error / config_error)", ""]
+        for err_type, count in sorted(s["fail_types"].items()):
+            lines.append(f"- `{err_type}`: {count}")
+        lines.append("")
+
+    if s.get("quality_fail_types"):
+        lines += ["## Quality Gate Failures (quality_error)", ""]
+        for err_type, count in sorted(s["quality_fail_types"].items()):
             lines.append(f"- `{err_type}`: {count}")
         lines.append("")
 
     lines += [
         "## Case Results",
         "",
-        "| ID | Status | Error Type | Duration (ms) | Message |",
-        "|----|--------|------------|---------------|---------|",
+        "| ID | Status | Error Type | Reason | Duration (ms) | Message |",
+        "|----|--------|------------|--------|---------------|---------|",
     ]
     for c in report["cases"]:
         status = "✅" if c["ok"] else "❌"
         dur = f"{c['duration_ms']:.1f}"
         err_type = f"`{c['error_type']}`" if c["error_type"] else "-"
+        reason = (c.get("reason") or "-")[:60].replace("|", "\\|")
         msg = (c["error_message"] or "-")[:80].replace("|", "\\|")
-        lines.append(f"| {c['id']} | {status} | {err_type} | {dur} | {msg} |")
+        lines.append(f"| {c['id']} | {status} | {err_type} | {reason} | {dur} | {msg} |")
 
     return "\n".join(lines) + "\n"
 

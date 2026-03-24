@@ -62,7 +62,8 @@ python3 eval/run_cases.py --server http://localhost:8080
     "runtime_fail_count": 0,
     "quality_fail_count": 1,
     "config_fail_count": 0,
-    "fail_type_counts": {
+    "fail_types": {},
+    "quality_fail_types": {
       "quality_error": 1
     }
   },
@@ -71,6 +72,7 @@ python3 eval/run_cases.py --server http://localhost:8080
       "id": "math_simple",
       "ok": false,
       "error_type": "quality_error",
+      "reason": "response missing expected term: '4'",
       "error_message": "response missing expected term: '4'",
       "duration_ms": 312.5,
       "timings_ms": { "total_ms": 312.5 },
@@ -79,3 +81,8 @@ python3 eval/run_cases.py --server http://localhost:8080
   ]
 }
 ```
+
+> **字段说明**
+> - `fail_types`：运行失败类型分布（`actual_success=false`），包含 `runtime_error`、`timeout_error`、`config_error`
+> - `quality_fail_types`：质量门控失败类型分布（服务正常响应但未满足质量要求），包含 `quality_error`
+> - `reason`（case 级别）：失败原因详情，质量门控失败时填写具体不满足的条件

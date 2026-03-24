@@ -59,6 +59,6 @@ python3 eval/run_cases.py --offline
 python3 eval/run_cases.py --server http://localhost:8080
 ```
 
-报告生成在 `eval/report.json` 和 `eval/report.md`，其中质量门控失败（`quality_error`）与运行时失败（`runtime_error` / `timeout_error`）分开计数。
+报告生成在 `eval/report.json` 和 `eval/report.md`，其中质量门控失败（`quality_fail_types` / `quality_error`）与运行时失败（`fail_types`：`runtime_error` / `timeout_error`）分开计数，每条用例包含 `reason` 字段说明具体失败原因。
 
 详见 [eval/README.md](eval/README.md)。
