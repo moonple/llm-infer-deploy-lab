@@ -38,8 +38,8 @@
 # 1. 进入目录
 cd ~/llm-infer-deploy-lab
 
-# 2. 启动服务
-./scripts/run_server.sh
+# 2. 启动服务（参考 llama.cpp 文档，例如）
+# ./llama-server -m /path/to/model.gguf --port 8080
 
 # 3. 测试 API（新开终端）
 curl http://localhost:8080/completion \

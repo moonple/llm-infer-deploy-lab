@@ -1,5 +1,0 @@
-14:15:44.650633 http.c:845              == Info: Couldn't find host github.com in the .netrc file; using defaults
-14:15:44.697726 http.c:845              == Info: Host github.com:443 was resolved.
-14:15:44.697768 http.c:845              == Info: IPv6: (none)
-14:15:44.697773 http.c:845              == Info: IPv4: 20.205.243.166
-14:15:44.697814 http.c:845              == Info:   Trying 20.205.243.166:443...
