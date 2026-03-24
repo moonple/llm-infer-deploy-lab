@@ -1,0 +1,27 @@
+[
+  {
+    "id": "basic_hello",
+    "prompt": "Say hello in one word.",
+    "n_predict": 10,
+    "temperature": 0.0,
+    "expect_min_len": 1,
+    "timeout_s": 30
+  },
+  {
+    "id": "math_simple",
+    "prompt": "What is 2+2? Answer with just the number.",
+    "n_predict": 10,
+    "temperature": 0.0,
+    "expect_min_len": 1,
+    "expect_contains": ["4"],
+    "timeout_s": 30
+  },
+  {
+    "id": "chinese_greeting",
+    "prompt": "用一句话介绍一下你自己。",
+    "n_predict": 50,
+    "temperature": 0.0,
+    "expect_min_len": 5,
+    "timeout_s": 60
+  }
+]
