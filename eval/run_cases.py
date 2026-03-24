@@ -52,26 +52,27 @@ class CaseResult:
     duration_ms: float
     timings_ms: dict = field(default_factory=dict)
     response_preview: Optional[str] = None
+    reason: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------
 # Quality gate
 # ---------------------------------------------------------------------------
 
-def _check_quality(response: dict, case: dict) -> tuple[bool, Optional[str]]:
-    """Return (passed, failure_message)."""
+def _check_quality(response: dict, case: dict) -> tuple[bool, Optional[str], Optional[str]]:
+    """Return (passed, reason_code, failure_message)."""
     text = response.get("content") or response.get("response") or ""
 
     if "expect_min_len" in case:
         min_len = int(case["expect_min_len"])
         if len(text) < min_len:
-            return False, f"response too short: {len(text)} chars < {min_len}"
+            return False, "response_too_short", f"response too short: {len(text)} chars < {min_len}"
 
     for term in case.get("expect_contains", []):
         if term.lower() not in text.lower():
-            return False, f"response missing expected term: {term!r}"
+            return False, "missing_term", f"response missing expected term: {term!r}"
 
-    return True, None
+    return True, None, None
 
 
 # ---------------------------------------------------------------------------
@@ -96,13 +97,14 @@ def run_case_online(case: dict, server_url: str) -> CaseResult:
             body = json.loads(resp.read())
         dur_ms = (time.perf_counter() - t0) * 1000.0
 
-        quality_ok, quality_msg = _check_quality(body, case)
+        quality_ok, quality_reason, quality_msg = _check_quality(body, case)
         if not quality_ok:
             return CaseResult(
                 id=case["id"],
                 ok=False,
                 error_type=ERROR_QUALITY,
                 error_message=quality_msg,
+                reason=quality_reason,
                 duration_ms=dur_ms,
                 timings_ms={"total_ms": dur_ms},
                 response_preview=(body.get("content") or body.get("response") or "")[:200],
@@ -172,9 +174,16 @@ def _build_report(results: list[CaseResult], mode: str) -> dict:
     failed = total - passed
 
     fail_type_counts: dict[str, int] = {}
+    fail_types: dict[str, int] = {}        # runtime / config failures
+    quality_fail_types: dict[str, int] = {}  # quality-gate failures keyed by reason
     for r in results:
         if r.error_type:
             fail_type_counts[r.error_type] = fail_type_counts.get(r.error_type, 0) + 1
+            if r.error_type == ERROR_QUALITY:
+                key = r.reason or r.error_type
+                quality_fail_types[key] = quality_fail_types.get(key, 0) + 1
+            else:
+                fail_types[r.error_type] = fail_types.get(r.error_type, 0) + 1
 
     return {
         "mode": mode,
@@ -188,11 +197,14 @@ def _build_report(results: list[CaseResult], mode: str) -> dict:
             "config_fail_count": fail_type_counts.get(ERROR_CONFIG, 0),
             "fail_type_counts": fail_type_counts,
         },
+        "fail_types": fail_types,
+        "quality_fail_types": quality_fail_types,
         "cases": [
             {
                 "id": r.id,
                 "ok": r.ok,
                 "error_type": r.error_type,
+                "reason": r.reason,
                 "error_message": r.error_message,
                 "duration_ms": r.duration_ms,
                 "timings_ms": r.timings_ms,
@@ -219,24 +231,35 @@ def _build_markdown(report: dict) -> str:
         "",
     ]
 
-    if s.get("fail_type_counts"):
-        lines += ["## Failure Breakdown by Error Type", ""]
-        for err_type, count in sorted(s["fail_type_counts"].items()):
+    fail_types = report.get("fail_types", {})
+    if fail_types:
+        lines += ["## Failure Types (runtime / config)", ""]
+        for err_type, count in sorted(fail_types.items()):
             lines.append(f"- `{err_type}`: {count}")
         lines.append("")
+
+    quality_fail_types = report.get("quality_fail_types", {})
+    lines += ["## Quality Gate Failures", ""]
+    if not quality_fail_types:
+        lines.append("- None")
+    else:
+        for reason, count in sorted(quality_fail_types.items()):
+            lines.append(f"- `{reason}`: {count}")
+    lines.append("")
 
     lines += [
         "## Case Results",
         "",
-        "| ID | Status | Error Type | Duration (ms) | Message |",
-        "|----|--------|------------|---------------|---------|",
+        "| ID | Status | Error Type | Reason | Duration (ms) | Message |",
+        "|----|--------|------------|--------|---------------|---------|",
     ]
     for c in report["cases"]:
         status = "✅" if c["ok"] else "❌"
         dur = f"{c['duration_ms']:.1f}"
         err_type = f"`{c['error_type']}`" if c["error_type"] else "-"
+        reason = c.get("reason") or "-"
         msg = (c["error_message"] or "-")[:80].replace("|", "\\|")
-        lines.append(f"| {c['id']} | {status} | {err_type} | {dur} | {msg} |")
+        lines.append(f"| {c['id']} | {status} | {err_type} | {reason} | {dur} | {msg} |")
 
     return "\n".join(lines) + "\n"
 

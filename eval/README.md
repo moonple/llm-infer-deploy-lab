@@ -66,11 +66,16 @@ python3 eval/run_cases.py --server http://localhost:8080
       "quality_error": 1
     }
   },
+  "fail_types": {},
+  "quality_fail_types": {
+    "missing_term": 1
+  },
   "cases": [
     {
       "id": "math_simple",
       "ok": false,
       "error_type": "quality_error",
+      "reason": "missing_term",
       "error_message": "response missing expected term: '4'",
       "duration_ms": 312.5,
       "timings_ms": { "total_ms": 312.5 },
@@ -79,3 +84,12 @@ python3 eval/run_cases.py --server http://localhost:8080
   ]
 }
 ```
+
+### 字段说明
+
+| 顶层字段 | 说明 |
+|----------|------|
+| `fail_types` | 运行时/配置失败类型计数（`runtime_error` / `timeout_error` / `config_error`） |
+| `quality_fail_types` | 质量门控失败原因计数（`response_too_short` / `missing_term`） |
+
+每个 case 的 `reason` 字段：质量门控失败时填写具体原因码（如 `response_too_short`、`missing_term`），其他情况为 `null`。
