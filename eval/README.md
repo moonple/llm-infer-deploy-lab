@@ -13,8 +13,8 @@ python3 eval/run_cases.py --offline
 ### 在线模式（需要本地服务已启动）
 
 ```bash
-# 先启动服务
-./scripts/run_server.sh
+# 先启动服务（参考项目文档中的 llama.cpp 启动命令）
+# 例如：./llama-server -m model.gguf --port 8080
 
 # 然后运行评测
 python3 eval/run_cases.py --server http://localhost:8080

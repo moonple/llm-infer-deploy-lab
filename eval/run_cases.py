@@ -93,8 +93,20 @@ def run_case_online(case: dict, server_url: str) -> CaseResult:
     )
     try:
         with urllib.request.urlopen(req, timeout=case.get("timeout_s", 30)) as resp:
-            body = json.loads(resp.read())
+            raw = resp.read()
         dur_ms = (time.perf_counter() - t0) * 1000.0
+
+        try:
+            body = json.loads(raw)
+        except json.JSONDecodeError as json_exc:
+            return CaseResult(
+                id=case["id"],
+                ok=False,
+                error_type=ERROR_RUNTIME,
+                error_message=f"invalid JSON response: {json_exc}",
+                duration_ms=dur_ms,
+                timings_ms={"total_ms": dur_ms},
+            )
 
         quality_ok, quality_msg = _check_quality(body, case)
         if not quality_ok:
@@ -118,18 +130,19 @@ def run_case_online(case: dict, server_url: str) -> CaseResult:
             response_preview=(body.get("content") or body.get("response") or "")[:200],
         )
 
-    except TimeoutError:
-        dur_ms = (time.perf_counter() - t0) * 1000.0
-        return CaseResult(
-            id=case["id"],
-            ok=False,
-            error_type=ERROR_TIMEOUT,
-            error_message=f"request timed out after {case.get('timeout_s', 30)}s",
-            duration_ms=dur_ms,
-            timings_ms={"total_ms": dur_ms},
-        )
     except urllib.error.URLError as exc:
         dur_ms = (time.perf_counter() - t0) * 1000.0
+        # urllib wraps socket.timeout (a TimeoutError subclass) inside URLError;
+        # check the reason to emit the stable timeout_error type.
+        if isinstance(exc.reason, TimeoutError):
+            return CaseResult(
+                id=case["id"],
+                ok=False,
+                error_type=ERROR_TIMEOUT,
+                error_message=f"request timed out after {case.get('timeout_s', 30)}s",
+                duration_ms=dur_ms,
+                timings_ms={"total_ms": dur_ms},
+            )
         return CaseResult(
             id=case["id"],
             ok=False,
